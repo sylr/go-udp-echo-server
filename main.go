@@ -1,40 +1,46 @@
+// https://gist.github.com/paulsmith/775764
+
 package main
 
 import (
-	"fmt"
-	"net"
-	"os"
+    "io"
+    "net"
+    "strconv"
+    "fmt"
 )
 
-// CheckError checks for errors
-func CheckError(err error) {
-	if err != nil {
-		fmt.Println("Error: ", err)
-		os.Exit(0)
-	}
-}
+const PORT = 7778
 
 func main() {
-	/* Lets prepare a address at any address at port 10001*/
-	ServerAddr, err := net.ResolveUDPAddr("udp", ":7778")
-	CheckError(err)
-	fmt.Println("listening on :7778")
+    server, err := net.ListenUDP("udp", ":" + strconv.Itoa(PORT))
+	
+    if server == nil {
+        panic("couldn't start listening: " + err.String())
+    }
+    conns := clientConns(server)
+    for {
+        go handleConn(<-conns)
+    }
+}
 
-	/* Now listen at selected port */
-	ServerConn, err := net.ListenUDP("udp", ServerAddr)
-	CheckError(err)
-	defer ServerConn.Close()
+func clientConns(listener net.Listener) chan net.Conn {
+    ch := make(chan net.Conn)
+    i := 0
+    go func() {
+        for {
+            client, err := listener.Accept()
+            if client == nil {
+                fmt.Printf("couldn't accept: " + err.String())
+                continue
+            }
+            i++
+            fmt.Printf("%d: %v <-> %v\n", i, client.LocalAddr(), client.RemoteAddr())
+            ch <- client
+        }
+    }()
+    return ch
+}
 
-	buf := make([]byte, 1024)
-
-	for {
-		n, addr, err := ServerConn.ReadFromUDP(buf)
-		fmt.Printf("received: %s from: %s\n", string(buf[0:n]), addr)
-
-		if err != nil {
-			fmt.Println("error: ", err)
-		}
-
-		ServerConn.WriteTo(buf[0:n], addr)
-	}
+func handleConn(client net.Conn) {
+    io.Copy(client, client);
 }
