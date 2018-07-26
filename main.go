@@ -12,7 +12,8 @@ import (
 const PORT = 7778
 
 func main() {
-    server, err := net.ListenUDP("udp", ":" + strconv.Itoa(PORT))
+    ServerAddr, err := net.ResolveUDPAddr("udp", ":" + strconv.Itoa(PORT))
+    server, err := net.ListenUDP("udp", ServerAddr)
 	
     if server == nil {
         panic("couldn't start listening: " + err.String())
