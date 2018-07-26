@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"net"
-	"runtime"
 )
 
 func listen(connection *net.UDPConn, quit chan struct{}) {
@@ -40,7 +39,7 @@ func main() {
 
 	quit := make(chan struct{})
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < 1; i++ {
 		go listen(connection, quit)
 	}
 
