@@ -1,47 +1,48 @@
-// https://gist.github.com/paulsmith/775764
+// Shamefully stolen from stackoverflow, did a bit of tuning though
+// https://stackoverflow.com/questions/28400340/how-support-concurrent-connections-with-a-udp-server-using-go
 
 package main
 
 import (
-    "io"
-    "net"
-    "strconv"
     "fmt"
+    "net"
+    "runtime"
 )
 
-const PORT = 7778
+func listen(connection *net.UDPConn, quit chan struct{}) {
+    buffer := make([]byte, 1024)
+    _, remoteAddr, err := 0, new(net.UDPAddr), error(nil)
+
+    for err == nil {
+        _, remoteAddr, err = connection.ReadFromUDP(buffer)
+        buffer_tmp := make([]byte, 1024)
+
+        copy(buffer_tmp, buffer)
+
+        go connection.WriteTo(buffer, remoteAddr)
+    }
+
+    fmt.Println("listener failed - ", err)
+    quit <- struct{}{}
+}
 
 func main() {
-    ServerAddr, err := net.ResolveUDPAddr("udp", ":" + strconv.Itoa(PORT))
-    server, err := net.ListenUDP("udp", ServerAddr)
-	
-    if server == nil {
-        panic("couldn't start listening: " + err.String())
+    addr := net.UDPAddr{
+        Port: 7778,
+        IP:   net.IP{0, 0, 0, 0},
     }
-    conns := clientConns(server)
-    for {
-        go handleConn(<-conns)
+
+    connection, err := net.ListenUDP("udp", &addr)
+
+    if err != nil {
+        panic(err)
     }
-}
 
-func clientConns(listener net.Listener) chan net.Conn {
-    ch := make(chan net.Conn)
-    i := 0
-    go func() {
-        for {
-            client, err := listener.Accept()
-            if client == nil {
-                fmt.Printf("couldn't accept: " + err.String())
-                continue
-            }
-            i++
-            fmt.Printf("%d: %v <-> %v\n", i, client.LocalAddr(), client.RemoteAddr())
-            ch <- client
-        }
-    }()
-    return ch
-}
+    quit := make(chan struct{})
 
-func handleConn(client net.Conn) {
-    io.Copy(client, client);
+    for i := 0; i < runtime.NumCPU(); i++ {
+        go listen(connection, quit)
+    }
+
+    <-quit // hang until an error
 }
